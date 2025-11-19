@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "waste_detector",
+			"path": "../.."
+		},
+		{
+			"name": "Dataset",
+			"path": "../../../../../../Downloads/archive (2)/Dataset"
+		}
+	],
+	"settings": {}
+}
