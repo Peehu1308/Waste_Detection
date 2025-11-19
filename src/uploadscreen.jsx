@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from "recharts";
@@ -16,19 +16,13 @@ const data = [
 
 export default function Dashboard() {
   const [isOpen, setIsOpen] = useState(false);
-  const navLinks = [
-    { label: "Home", href: "#home" },
-    { label: "Features", href: "#features" },
-    { label: "About", href: "#about" },
-    { label: "Impact", href: "#impact" },
-    { label: "Contact", href: "#contact" },
-  ];
-
   const [file, setFile] = useState(null);
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [reports, setReports] = useState([]); // store uploaded images info
+  const [activePage, setActivePage] = useState("upload"); // upload or report
 
   const handleUpload = (e) => {
     setFile(e.target.files[0]);
@@ -42,7 +36,6 @@ export default function Dashboard() {
       alert("Please upload an image");
       return;
     }
-
     setLoading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -52,22 +45,20 @@ export default function Dashboard() {
         method: "POST",
         body: formData,
       });
-
       const data = await res.json();
       setResult(data.predicted_class);
-      setShowModal(true); // open modal for verification
+      setShowModal(true);
     } catch (err) {
-      console.error("Error uploading image:", err);
+      console.error(err);
       alert("Failed to predict. Please try again.");
     }
-
     setLoading(false);
   };
 
   const handleSave = async (category) => {
     if (!file) return;
-
     setLoading(true);
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
@@ -77,12 +68,23 @@ export default function Dashboard() {
         method: "POST",
         body: formData,
       });
+      // Save to reports state
+      setReports((prev) => [
+        ...prev,
+        {
+          name: file.name,
+          detected: result,
+          actual: category,
+          url: URL.createObjectURL(file)
+        }
+      ]);
       alert(`Image saved to ${category} folder successfully!`);
       setShowModal(false);
       setFile(null);
       setResult("");
+      setSelectedCategory("");
     } catch (err) {
-      console.error("Error saving image:", err);
+      console.error(err);
       alert("Failed to save image.");
     }
 
@@ -98,11 +100,8 @@ export default function Dashboard() {
           <a href="/" className="text-2xl font-bold text-gray-900">Swachhta</a>
 
           <ul className="hidden md:flex space-x-8 text-gray-600 font-medium">
-            {navLinks.map((link) => (
-              <li key={link.label}>
-                <a href={link.href} className="hover:text-black transition-colors duration-200">{link.label}</a>
-              </li>
-            ))}
+            <li><button onClick={() => setActivePage("upload")} className="hover:text-black transition">{`Upload`}</button></li>
+            <li><button onClick={() => setActivePage("report")} className="hover:text-black transition">{`Reports`}</button></li>
           </ul>
 
           <button className="md:hidden text-gray-700" onClick={() => setIsOpen(!isOpen)}>
@@ -113,25 +112,21 @@ export default function Dashboard() {
         {isOpen && (
           <div className="md:hidden bg-white shadow-md animate-fadein">
             <ul className="flex flex-col items-center space-y-4 py-6 text-gray-700 font-medium">
-              {navLinks.map((link) => (
-                <li key={link.label}>
-                  <a href={link.href} onClick={() => setIsOpen(false)} className="block text-lg hover:text-black transition-colors duration-200">{link.label}</a>
-                </li>
-              ))}
+              <li><button onClick={() => { setActivePage("upload"); setIsOpen(false); }}>Upload</button></li>
+              <li><button onClick={() => { setActivePage("report"); setIsOpen(false); }}>Reports</button></li>
             </ul>
           </div>
         )}
       </header>
 
-      {/* Main Layout */}
       <div className="flex flex-col md:flex-row pt-20">
 
         {/* Sidebar */}
         <aside className="w-full md:w-64 bg-white border-r p-6">
           <h2 className="text-xl font-semibold mb-8">Dashboard</h2>
           <nav className="space-y-4">
-            <button className="block w-full text-left py-2 px-3 bg-gray-100 rounded-lg">Upload Waste</button>
-            <button className="block w-full text-left py-2 px-3 hover:bg-gray-100 rounded-lg">Reports</button>
+            <button onClick={() => setActivePage("upload")} className={`block w-full text-left py-2 px-3 rounded-lg ${activePage === "upload" ? "bg-gray-100" : "hover:bg-gray-100"}`}>Upload Waste</button>
+            <button onClick={() => setActivePage("report")} className={`block w-full text-left py-2 px-3 rounded-lg ${activePage === "report" ? "bg-gray-100" : "hover:bg-gray-100"}`}>Reports</button>
             <button className="block w-full text-left py-2 px-3 hover:bg-gray-100 rounded-lg">Settings</button>
           </nav>
         </aside>
@@ -139,33 +134,71 @@ export default function Dashboard() {
         {/* Main Content */}
         <main className="flex-1 p-6 md:p-10">
 
-          {/* Upload Card */}
-          <div className="bg-white p-6 rounded-xl shadow mb-6">
-            <h3 className="text-xl font-semibold">Welcome, Samantha Lee!</h3>
-            <p className="text-gray-500 mt-1">Overview of waste detection activities.</p>
+          {/* Upload Page */}
+          {activePage === "upload" && (
+            <>
+              <div className="bg-white p-6 rounded-xl shadow mb-6">
+                <h3 className="text-xl font-semibold">Welcome, Samantha Lee!</h3>
+                <p className="text-gray-500 mt-1">Overview of waste detection activities.</p>
 
-            <div className="mt-4">
-              <label className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded-lg mr-3 inline-block">
-                Upload Waste Image
-                <input type="file" className="hidden" onChange={handleUpload} />
-              </label>
+                <div className="mt-4">
+                  <label className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded-lg mr-3 inline-block">
+                    Upload Waste Image
+                    <input type="file" className="hidden" onChange={handleUpload} />
+                  </label>
 
-              <button
-                onClick={handleDetect}
-                className="bg-black text-white px-4 py-2 rounded-lg mt-2 md:mt-0"
-              >
-                {loading ? "Detecting..." : "Start Detection"}
-              </button>
+                  <button
+                    onClick={handleDetect}
+                    className="bg-black text-white px-4 py-2 rounded-lg mt-2 md:mt-0"
+                  >
+                    {loading ? "Detecting..." : "Start Detection"}
+                  </button>
 
-              {result && !loading && (
-                <p className="mt-4 text-lg font-semibold">
-                  Detected Category: <span className="text-green-600">{result}</span>
-                </p>
-              )}
+                  {result && !loading && (
+                    <p className="mt-4 text-lg font-semibold">
+                      Detected Category: <span className="text-green-600">{result}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                <div className="bg-white p-6 rounded-xl shadow">
+                  <h3 className="text-xl font-semibold">Waste Detection Trends</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={data}>
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="Plastic" fill="#4ade80" />
+                      <Bar dataKey="Organic" fill="#facc15" />
+                      <Bar dataKey="Metal" fill="#f87171" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Reports Page */}
+          {activePage === "report" && (
+            <div className="bg-white p-6 rounded-xl shadow">
+              <h3 className="text-xl font-semibold mb-4">Previous Uploads</h3>
+              {reports.length === 0 && <p>No reports yet.</p>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {reports.map((report, index) => (
+                  <div key={index} className="border rounded p-4 flex flex-col items-center">
+                    <img src={report.url} alt={report.name} className="w-40 h-40 object-cover mb-2 rounded"/>
+                    <p><strong>Name:</strong> {report.name}</p>
+                    <p><strong>Detected:</strong> {report.detected}</p>
+                    <p><strong>Actual:</strong> {report.actual}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Modal for verification */}
+          {/* Modal */}
           {showModal && (
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
               <div className="bg-white rounded-lg shadow-lg p-6 w-80 text-center">
@@ -186,7 +219,6 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* If wrong, select correct category */}
                 {selectedCategory && (
                   <div className="mt-4">
                     <p>Select correct category:</p>
@@ -210,23 +242,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-
-          {/* Bottom Section → chart */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            <div className="bg-white p-6 rounded-xl shadow">
-              <h3 className="text-xl font-semibold">Waste Detection Trends</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={data}>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="Plastic" />
-                  <Bar dataKey="Organic" />
-                  <Bar dataKey="Metal" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
         </main>
       </div>
