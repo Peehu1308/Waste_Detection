@@ -8,11 +8,13 @@ const Header_App = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const navLinks = [
-    { label: "Home", href: "#home" },
-    { label: "Features", href: "#features" },
-    { label: "About", href: "#about" },
-    { label: "Impact", href: "#impact" },
-    { label: "Contact", href: "#contact" },
+    { label: "Home", href: "/home" },
+    { label: "Features", href: "/features" },
+    { label: "Gamification", href: "/gamification" },
+    { label: "About", href: "/about" },
+    
+    { label: "Impact", href: "/impact" },
+
   ];
 
   return (

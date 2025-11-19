@@ -28,6 +28,7 @@ const Banner = () => {
           </button>
 
           <button
+          onClick={() => navigate("/features")}
             className="px-8 py-3 bg-white border border-green-600 text-green-600 rounded-lg font-medium shadow-md hover:bg-green-50 transition-all duration-300"
           >
             Learn More

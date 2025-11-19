@@ -16,6 +16,16 @@ const data = [
   { name: "Jul", Plastic: 310, Organic: 200, Metal: 150 }
 ];
 
+// Disposal recommendations
+const disposalRecommendations = {
+  Plastic: "Dispose in the Yellow bin.",
+  Organic: "Dispose in the Green bin.",
+  Metal: "Dispose in the Blue bin.",
+  Paper: "Dispose in the Green bin.",
+  Glass: "Dispose in the Blue bin.",
+  Other: "Dispose in the Red bin."
+};
+
 export default function Dashboard() {
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState(null);
@@ -28,6 +38,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 4;
+  const [showRecommendation, setShowRecommendation] = useState(false);
 
   // Drag-and-drop handler
   const handleDrop = (e) => {
@@ -38,6 +49,7 @@ export default function Dashboard() {
       setResult("");
       setShowModal(false);
       setSelectedCategory("");
+      setShowRecommendation(false);
     }
   };
 
@@ -47,6 +59,7 @@ export default function Dashboard() {
     setResult("");
     setShowModal(false);
     setSelectedCategory("");
+    setShowRecommendation(false);
   };
 
   const handleDetect = async () => {
@@ -102,6 +115,7 @@ export default function Dashboard() {
       setFile(null);
       setResult("");
       setSelectedCategory("");
+      setShowRecommendation(true);
     } catch (err) {
       console.error(err);
       alert("Failed to save image.");
@@ -126,29 +140,23 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Navbar */}
       <header className="bg-white w-full shadow-md fixed top-0 left-0 z-50">
         <nav className="container mx-auto flex items-center justify-between px-6 py-3">
           <a href="/" className="text-2xl font-bold text-gray-900">Swachhta</a>
 
           <ul className="hidden md:flex space-x-8 text-gray-600 font-medium">
-            <li><button onClick={() => setActivePage("upload")} className="hover:text-black transition">Upload</button></li>
-            <li><button onClick={() => setActivePage("report")} className="hover:text-black transition">Reports</button></li>
+            <li><a href="/home" className="hover:text-black transition">Home</a></li>
+            <li><a href="/features" className="hover:text-black transition">Features</a></li>
+            <li><a href="/gamification" className="hover:text-black transition">Gamification</a></li>
+            <li><a href="/about" className="hover:text-black transition">About</a></li>
+            <li><a href="/impact" className="hover:text-black transition">Impact</a></li>
+            
           </ul>
 
-          <button className="md:hidden text-gray-700" onClick={() => setIsOpen(!isOpen)}>
-            {isOpen ? <X size={28} /> : <Menu size={28} />}
+          <button className="md:hidden text-gray-700">
+            {/* You can add mobile menu toggle if needed */}
           </button>
         </nav>
-
-        {isOpen && (
-          <div className="md:hidden bg-white shadow-md animate-fadein">
-            <ul className="flex flex-col items-center space-y-4 py-6 text-gray-700 font-medium">
-              <li><button onClick={() => { setActivePage("upload"); setIsOpen(false); }}>Upload</button></li>
-              <li><button onClick={() => { setActivePage("report"); setIsOpen(false); }}>Reports</button></li>
-            </ul>
-          </div>
-        )}
       </header>
 
       <div className="flex flex-col md:flex-row pt-20">
@@ -205,6 +213,12 @@ export default function Dashboard() {
                     </p>
                     <p className="text-gray-500">Confidence: 90% (placeholder)</p>
                     <p className="text-gray-500">Top 3 predictions: {result}, Plastic, Organic (placeholder)</p>
+
+                    {showRecommendation && (
+                      <p className="mt-2 text-blue-600 font-medium">
+                        Recommendation: {disposalRecommendations[result] || "Dispose properly."}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

@@ -12,6 +12,9 @@ import { BrowserRouter, Routes } from 'react-router-dom';
 import { Route } from 'react-router-dom';
 import Dashboard from './uploadscreen';
 import Homescreen from './Homescreen';
+import FeaturesPage from './Features';
+import AboutPage from './About';
+import ImpactPage from './Impact';
 
 function App() {
   const [image,setimage]=React.useState(null);
@@ -48,6 +51,9 @@ function App() {
         <Route path="/gamification" element={<GamificationScreen />} />
         <Route path="/upload" element={<Dashboard />} />
         <Route path="/home" element={<Homescreen/>}/>
+        <Route path="/features" element={<FeaturesPage/>}/>
+        <Route path="/about" element={<AboutPage/>}/>
+        <Route path="/impact" element={<ImpactPage/>}/>
       </Routes></BrowserRouter>
       
     </div>
