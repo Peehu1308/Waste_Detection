@@ -47,7 +47,7 @@ function App() {
         
         <Route path="/gamification" element={<GamificationScreen />} />
         <Route path="/upload" element={<Dashboard />} />
-        <Route path="/" element={<Homescreen/>}/>
+        <Route path="/home" element={<Homescreen/>}/>
       </Routes></BrowserRouter>
       
     </div>

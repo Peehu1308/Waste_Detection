@@ -3,6 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from "recharts";
 import { Menu, X } from "lucide-react";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import ReactPaginate from "react-paginate";
 
 const data = [
   { name: "Jan", Plastic: 240, Organic: 100, Metal: 80 },
@@ -21,11 +23,27 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [reports, setReports] = useState([]); // store uploaded images info
-  const [activePage, setActivePage] = useState("upload"); // upload or report
+  const [reports, setReports] = useState([]);
+  const [activePage, setActivePage] = useState("upload");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(0);
+  const itemsPerPage = 4;
+
+  // Drag-and-drop handler
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      setFile(droppedFile);
+      setResult("");
+      setShowModal(false);
+      setSelectedCategory("");
+    }
+  };
 
   const handleUpload = (e) => {
-    setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    setFile(selectedFile);
     setResult("");
     setShowModal(false);
     setSelectedCategory("");
@@ -58,7 +76,6 @@ export default function Dashboard() {
   const handleSave = async (category) => {
     if (!file) return;
     setLoading(true);
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("category", category);
@@ -68,16 +85,18 @@ export default function Dashboard() {
         method: "POST",
         body: formData,
       });
-      // Save to reports state
+
       setReports((prev) => [
         ...prev,
         {
           name: file.name,
           detected: result,
           actual: category,
-          url: URL.createObjectURL(file)
+          url: URL.createObjectURL(file),
+          date: new Date().toLocaleString(),
         }
       ]);
+
       alert(`Image saved to ${category} folder successfully!`);
       setShowModal(false);
       setFile(null);
@@ -87,8 +106,21 @@ export default function Dashboard() {
       console.error(err);
       alert("Failed to save image.");
     }
-
     setLoading(false);
+  };
+
+  // Pagination
+  const filteredReports = reports.filter(r =>
+    r.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const pageCount = Math.ceil(filteredReports.length / itemsPerPage);
+  const displayReports = filteredReports.slice(
+    currentPage * itemsPerPage,
+    currentPage * itemsPerPage + itemsPerPage
+  );
+
+  const handlePageClick = ({ selected }) => {
+    setCurrentPage(selected);
   };
 
   return (
@@ -100,8 +132,8 @@ export default function Dashboard() {
           <a href="/" className="text-2xl font-bold text-gray-900">Swachhta</a>
 
           <ul className="hidden md:flex space-x-8 text-gray-600 font-medium">
-            <li><button onClick={() => setActivePage("upload")} className="hover:text-black transition">{`Upload`}</button></li>
-            <li><button onClick={() => setActivePage("report")} className="hover:text-black transition">{`Reports`}</button></li>
+            <li><button onClick={() => setActivePage("upload")} className="hover:text-black transition">Upload</button></li>
+            <li><button onClick={() => setActivePage("report")} className="hover:text-black transition">Reports</button></li>
           </ul>
 
           <button className="md:hidden text-gray-700" onClick={() => setIsOpen(!isOpen)}>
@@ -141,25 +173,40 @@ export default function Dashboard() {
                 <h3 className="text-xl font-semibold">Welcome, Samantha Lee!</h3>
                 <p className="text-gray-500 mt-1">Overview of waste detection activities.</p>
 
-                <div className="mt-4">
-                  <label className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded-lg mr-3 inline-block">
-                    Upload Waste Image
+                {/* Drag-and-drop area */}
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  className="w-full h-40 border-2 border-dashed rounded flex items-center justify-center cursor-pointer mt-4"
+                >
+                  {file ? (
+                    <img src={URL.createObjectURL(file)} alt="preview" className="h-full object-contain"/>
+                  ) : "Drag & Drop Image Here or Click to Upload"}
+                  <input type="file" className="hidden" onChange={handleUpload} />
+                </div>
+
+                <div className="mt-4 flex flex-col md:flex-row gap-2">
+                  <label className="cursor-pointer bg-green-500 text-white px-4 py-2 rounded-lg">
+                    Browse File
                     <input type="file" className="hidden" onChange={handleUpload} />
                   </label>
-
                   <button
                     onClick={handleDetect}
-                    className="bg-black text-white px-4 py-2 rounded-lg mt-2 md:mt-0"
+                    className="bg-black text-white px-4 py-2 rounded-lg"
                   >
                     {loading ? "Detecting..." : "Start Detection"}
                   </button>
+                </div>
 
-                  {result && !loading && (
-                    <p className="mt-4 text-lg font-semibold">
+                {result && !loading && (
+                  <div className="mt-4">
+                    <p className="text-lg font-semibold">
                       Detected Category: <span className="text-green-600">{result}</span>
                     </p>
-                  )}
-                </div>
+                    <p className="text-gray-500">Confidence: 90% (placeholder)</p>
+                    <p className="text-gray-500">Top 3 predictions: {result}, Plastic, Organic (placeholder)</p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
@@ -184,17 +231,46 @@ export default function Dashboard() {
           {activePage === "report" && (
             <div className="bg-white p-6 rounded-xl shadow">
               <h3 className="text-xl font-semibold mb-4">Previous Uploads</h3>
-              {reports.length === 0 && <p>No reports yet.</p>}
+
+              <input
+                type="text"
+                placeholder="Search reports..."
+                className="border p-2 rounded w-full mb-4"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+
+              {filteredReports.length === 0 && <p>No reports found.</p>}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {reports.map((report, index) => (
+                {displayReports.map((report, index) => (
                   <div key={index} className="border rounded p-4 flex flex-col items-center">
-                    <img src={report.url} alt={report.name} className="w-40 h-40 object-cover mb-2 rounded"/>
+                    <TransformWrapper>
+                      <TransformComponent>
+                        <img src={report.url} alt={report.name} className="w-40 h-40 object-cover mb-2 rounded"/>
+                      </TransformComponent>
+                    </TransformWrapper>
                     <p><strong>Name:</strong> {report.name}</p>
                     <p><strong>Detected:</strong> {report.detected}</p>
                     <p><strong>Actual:</strong> {report.actual}</p>
+                    <p className="text-gray-500 text-sm">{report.date}</p>
                   </div>
                 ))}
               </div>
+
+              {pageCount > 1 && (
+                <ReactPaginate
+                  previousLabel={"← Previous"}
+                  nextLabel={"Next →"}
+                  pageCount={pageCount}
+                  onPageChange={handlePageClick}
+                  containerClassName={"flex justify-center mt-4 gap-2"}
+                  pageClassName={"border px-3 py-1 rounded cursor-pointer"}
+                  activeClassName={"bg-gray-200"}
+                  previousClassName={"px-3 py-1 border rounded cursor-pointer"}
+                  nextClassName={"px-3 py-1 border rounded cursor-pointer"}
+                />
+              )}
             </div>
           )}
 

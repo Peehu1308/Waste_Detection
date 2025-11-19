@@ -1,35 +1,18 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from model import WasteSegModel
-import torch
-from torchvision import transforms
+from pathlib import Path
+from werkzeug.utils import secure_filename  # safer filenames
 from PIL import Image
 import io
 import os
-from pathlib import Path
-from werkzeug.utils import secure_filename  # optional, safer filename handling
+from ultralytics import YOLO
+import hashlib
 
 # Define classes
 classes = [
     'ewaste', 'food_waste', 'leaf_waste', 'metal_cans',
     'paper_waste', 'plastic_bags', 'plastic_bottles', 'wood_waste'
 ]
-
-# Device setup
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# Load model
-model = WasteSegModel(num_classes=len(classes))
-model.load_state_dict(torch.load("../waste_model.pth", map_location=device))
-model.to(device)
-model.eval()
-
-# Transform
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-])
 
 # FastAPI app
 app = FastAPI()
@@ -45,39 +28,69 @@ app.add_middleware(
 
 # Folder to save uploaded images
 UPLOAD_FOLDER = Path("../Dataset/UploadedImages")
-UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)  # create if not exists
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
+# Load YOLO model (can be pretrained or your custom weights)
+# Use YOLOv8 small model for speed
+model = YOLO("yolov8n.pt")  # or "runs/detect/train/weights/best.pt" if trained on your dataset
+
+# Helper: compute file hash to detect repeats
+def get_file_hash(file_bytes):
+    return hashlib.md5(file_bytes).hexdigest()
+
+# Save image to folder by class
 def save_image(file: UploadFile, predicted_class: str) -> str:
-    """
-    Saves the uploaded image in a folder by class.
-    Returns the saved file path.
-    """
     class_folder = UPLOAD_FOLDER / predicted_class
     class_folder.mkdir(parents=True, exist_ok=True)
     filename = secure_filename(file.filename)
     save_path = class_folder / filename
+    file.file.seek(0)
     with open(save_path, "wb") as f:
         f.write(file.file.read())
     return str(save_path)
 
+# Predict route
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     # Read image bytes
     img_bytes = await file.read()
-    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    
+    # Check if image already exists in saved folders using hash
+    file_hash = get_file_hash(img_bytes)
+    for category in UPLOAD_FOLDER.iterdir():
+        if not category.is_dir():
+            continue
+        for f in category.iterdir():
+            with open(f, "rb") as existing_file:
+                existing_hash = get_file_hash(existing_file.read())
+                if existing_hash == file_hash:
+                    return {
+                        "predicted_class": category.name,
+                        "message": "Image already exists"
+                    }
 
-    # Transform and predict
-    img = transform(image).unsqueeze(0).to(device)
-    with torch.no_grad():
-        outputs = model(img)
-        _, predicted = torch.max(outputs, 1)
-    result = classes[predicted.item()]
+    # Run YOLO detection
+    results = model(io.BytesIO(img_bytes))  # detect objects from bytes
 
-    # Save the uploaded image into a folder named by class
-    file.file.seek(0)  # reset file pointer
-    saved_path = save_image(file, result)
+    detections = []
+    for r in results:
+        for box in r.boxes:
+            cls_name = model.names[int(box.cls)]
+            conf = float(box.conf)
+            detections.append({"class": cls_name, "confidence": conf})
+
+    # Choose highest confidence class as main prediction
+    if detections:
+        main_class = max(detections, key=lambda x: x["confidence"])["class"]
+    else:
+        main_class = "Unknown"
+
+    # Save image into folder by predicted class
+    file.file.seek(0)
+    saved_path = save_image(file, main_class)
 
     return {
-        "predicted_class": result,
+        "predicted_class": main_class,
+        "detections": detections,
         "saved_path": saved_path
     }
